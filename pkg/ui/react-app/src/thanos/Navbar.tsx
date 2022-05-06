@@ -96,7 +96,7 @@ const Navigation: FC<PathPrefixProps & NavigationProps> = ({ pathPrefix, thanosC
     <Navbar className="mb-3" dark color="dark" expand="md" fixed="top">
       <NavbarToggler onClick={toggle} className="mr-2" />
       <Link className="navbar-brand" to={`${pathPrefix}${defaultRoute}`}>
-        Thanos - {thanosComponent[0].toUpperCase()}
+        BCS-Monitor - {thanosComponent[0].toUpperCase()}
         {thanosComponent.substr(1, thanosComponent.length)}
       </Link>
       <Collapse isOpen={isOpen} navbar style={{ justifyContent: 'space-between' }}>
