@@ -311,7 +311,24 @@ func (s *ProxyStore) Series(r *storepb.SeriesRequest, srv storepb.Store_SeriesSe
 				"store.addr": st.Addr(),
 			})
 
-			sc, err := st.Series(seriesCtx, r)
+			// BCS 支持 LabelMatch
+			err := func() error {
+				for _, labelMatchReq := range MakeLabelMatchSeriesRequest(gctx, r) {
+					sc, err := st.Series(seriesCtx, labelMatchReq)
+					if err != nil {
+						if r.PartialResponseDisabled {
+							return err
+						}
+						continue
+					}
+					// Schedule streamSeriesSet that translates gRPC streamed response
+					// into seriesSet (if series) or respCh if warnings.
+					seriesSet = append(seriesSet, startStreamSeriesSet(seriesCtx, reqLogger, span, closeSeries,
+						wg, sc, respSender, st.String(), !r.PartialResponseDisabled, s.responseTimeout, s.metrics.emptyStreamResponses))
+				}
+				return nil
+			}()
+
 			if err != nil {
 				err = errors.Wrapf(err, "fetch series for %s %s", storeID, st)
 				span.SetTag("err", err.Error())
@@ -323,11 +340,6 @@ func (s *ProxyStore) Series(r *storepb.SeriesRequest, srv storepb.Store_SeriesSe
 				respSender.send(storepb.NewWarnSeriesResponse(err))
 				continue
 			}
-
-			// Schedule streamSeriesSet that translates gRPC streamed response
-			// into seriesSet (if series) or respCh if warnings.
-			seriesSet = append(seriesSet, startStreamSeriesSet(seriesCtx, reqLogger, span, closeSeries,
-				wg, sc, respSender, st.String(), !r.PartialResponseDisabled, s.responseTimeout, s.metrics.emptyStreamResponses))
 		}
 
 		level.Debug(reqLogger).Log("msg", "Series: started fanout streams", "status", strings.Join(storeDebugMsgs, ";"))
