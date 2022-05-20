@@ -34,14 +34,50 @@ func LabelMatchValue(ctx context.Context) ([][]*labels.Matcher, bool) {
 	return v, ok
 }
 
-// MakeLabelMatchSeriesRequest
-func MakeLabelMatchSeriesRequest(ctx context.Context, r *storepb.SeriesRequest) []*storepb.SeriesRequest {
+// makeSeriesRequest
+func makeSeriesRequest(ctx context.Context, r *storepb.SeriesRequest) []*storepb.SeriesRequest {
 	matchValues, ok := LabelMatchValue(ctx)
 	if !ok {
 		return []*storepb.SeriesRequest{r}
 	}
 
 	reqs := make([]*storepb.SeriesRequest, 0, len(matchValues))
+	for _, v := range matchValues {
+		storeMatchers, _ := storepb.PromMatchersToMatchers(v...)
+		newReq := *r
+		newReq.Matchers = append(newReq.Matchers, storeMatchers...)
+		reqs = append(reqs, &newReq)
+	}
+
+	return reqs
+}
+
+// makeLabelNamesRequest
+func makeLabelNamesRequest(ctx context.Context, r *storepb.LabelNamesRequest) []*storepb.LabelNamesRequest {
+	matchValues, ok := LabelMatchValue(ctx)
+	if !ok {
+		return []*storepb.LabelNamesRequest{r}
+	}
+
+	reqs := make([]*storepb.LabelNamesRequest, 0, len(matchValues))
+	for _, v := range matchValues {
+		storeMatchers, _ := storepb.PromMatchersToMatchers(v...)
+		newReq := *r
+		newReq.Matchers = append(newReq.Matchers, storeMatchers...)
+		reqs = append(reqs, &newReq)
+	}
+
+	return reqs
+}
+
+// makeLabelValuesRequest
+func makeLabelValuesRequest(ctx context.Context, r *storepb.LabelValuesRequest) []*storepb.LabelValuesRequest {
+	matchValues, ok := LabelMatchValue(ctx)
+	if !ok {
+		return []*storepb.LabelValuesRequest{r}
+	}
+
+	reqs := make([]*storepb.LabelValuesRequest, 0, len(matchValues))
 	for _, v := range matchValues {
 		storeMatchers, _ := storepb.PromMatchersToMatchers(v...)
 		newReq := *r
