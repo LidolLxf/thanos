@@ -5,6 +5,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/thanos-io/thanos/pkg/store/storepb"
@@ -49,4 +50,54 @@ func MakeLabelMatchSeriesRequest(ctx context.Context, r *storepb.SeriesRequest) 
 	}
 
 	return reqs
+}
+
+// storeMatchAnyMetadata 可以匹配任意Label
+func storeMatchAnyMetadata(s Client, storeDebugMatchers [][]*labels.Matcher) (ok bool, reason string) {
+	if len(storeDebugMatchers) == 0 {
+		return true, ""
+	}
+
+	labelSets := s.LabelSets()
+	for idx, ls := range labelSets {
+		labelSets[idx] = append(ls, labels.Label{Name: "__address__", Value: s.Addr()})
+	}
+
+	for _, sm := range storeDebugMatchers {
+		if labelSetsMatchAny(sm, labelSets...) {
+			return true, ""
+		}
+	}
+
+	return false, fmt.Sprintf("%v does not match debug store metadata matchers: %v", labelSets, storeDebugMatchers)
+}
+
+// labelSetsMatchAny 满足任意
+func labelSetsMatchAny(matchers []*labels.Matcher, lset ...labels.Labels) bool {
+	if len(lset) == 0 {
+		return true
+	}
+
+	for _, ls := range lset {
+		if labelSetsMatchAll(matchers, ls) {
+			return true
+		}
+	}
+	return false
+}
+
+// labelSetsMatchAll 满足所有
+func labelSetsMatchAll(matchers []*labels.Matcher, ls labels.Labels) bool {
+	// 空值返回 false
+	if len(ls) == 0 {
+		return false
+	}
+
+	for _, m := range matchers {
+		// 值不存在或者不匹配都不符合
+		if lv := ls.Get(m.Name); lv == "" || !m.Matches(lv) {
+			return false
+		}
+	}
+	return true
 }

@@ -586,7 +586,7 @@ func storeMatches(ctx context.Context, s Client, mint, maxt int64, matchers ...*
 		return false, fmt.Sprintf("does not have data within this time period: [%v,%v]. Store time ranges: [%v,%v]", mint, maxt, storeMinTime, storeMaxTime)
 	}
 
-	if ok, reason := storeMatchDebugMetadata(s, storeDebugMatcher); !ok {
+	if ok, reason := storeMatchAnyMetadata(s, storeDebugMatcher); !ok {
 		return false, reason
 	}
 
