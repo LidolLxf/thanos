@@ -37,7 +37,7 @@ func LabelMatchValue(ctx context.Context) ([][]*labels.Matcher, bool) {
 // makeSeriesRequest
 func makeSeriesRequest(ctx context.Context, r *storepb.SeriesRequest) []*storepb.SeriesRequest {
 	matchValues, ok := LabelMatchValue(ctx)
-	if !ok {
+	if !ok || len(matchValues) == 0 {
 		return []*storepb.SeriesRequest{r}
 	}
 
@@ -55,7 +55,7 @@ func makeSeriesRequest(ctx context.Context, r *storepb.SeriesRequest) []*storepb
 // makeLabelNamesRequest
 func makeLabelNamesRequest(ctx context.Context, r *storepb.LabelNamesRequest) []*storepb.LabelNamesRequest {
 	matchValues, ok := LabelMatchValue(ctx)
-	if !ok {
+	if !ok || len(matchValues) == 0 {
 		return []*storepb.LabelNamesRequest{r}
 	}
 
@@ -73,7 +73,7 @@ func makeLabelNamesRequest(ctx context.Context, r *storepb.LabelNamesRequest) []
 // makeLabelValuesRequest
 func makeLabelValuesRequest(ctx context.Context, r *storepb.LabelValuesRequest) []*storepb.LabelValuesRequest {
 	matchValues, ok := LabelMatchValue(ctx)
-	if !ok {
+	if !ok || len(matchValues) == 0 {
 		return []*storepb.LabelValuesRequest{r}
 	}
 
