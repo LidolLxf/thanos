@@ -33,10 +33,10 @@ const navConfig: { [component: string]: (NavConfig | NavDropDown)[] } = {
       name: 'Status',
       children: [
         { name: 'Runtime & Build Information', uri: '/status' },
-        { name: 'Command-Line Flags', uri: '/flags' },
-        { name: 'Alerts', uri: '/alerts' },
-        { name: 'Targets', uri: '/targets' },
-        { name: 'Rules', uri: '/rules' },
+        // { name: 'Command-Line Flags', uri: '/flags' },
+        // { name: 'Alerts', uri: '/alerts' },
+        // { name: 'Targets', uri: '/targets' },
+        // { name: 'Rules', uri: '/rules' },
       ],
     },
   ],
@@ -126,9 +126,9 @@ const Navigation: FC<PathPrefixProps & NavigationProps> = ({ pathPrefix, thanosC
               </UncontrolledDropdown>
             );
           })}
-          <NavItem>
+          {/* <NavItem>
             <NavLink href="https://thanos.io/tip/thanos/getting-started.md/">Help</NavLink>
-          </NavItem>
+          </NavItem> */}
         </Nav>
       </Collapse>
       <ThemeToggle />
