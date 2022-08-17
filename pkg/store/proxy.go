@@ -347,7 +347,12 @@ func (s *ProxyStore) Series(r *storepb.SeriesRequest, srv storepb.Store_SeriesSe
 		if len(seriesSet) == 0 {
 			// This is indicates that configured StoreAPIs are not the ones end user expects.
 			err := errors.New("No StoreAPIs matched for this query")
-			level.Warn(reqLogger).Log("err", err, "stores", strings.Join(storeDebugMsgs, ";"))
+			// bcs patch, 减少日志长度
+			storesMsg := strings.Join(storeDebugMsgs, ";")
+			if len(storesMsg) > 64 {
+				storesMsg = storesMsg[:64] + "...(truncated)"
+			}
+			level.Warn(reqLogger).Log("err", err, "stores", storesMsg)
 			respSender.send(storepb.NewWarnSeriesResponse(err))
 			return nil
 		}
