@@ -9,18 +9,29 @@ import (
 
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/thanos-io/thanos/pkg/store/storepb"
+	"google.golang.org/grpc/metadata"
 )
 
-// LabelMatchKey
-const LabelMatchKey = ctxKey(1)
+const (
+	// LabelMatchKey
+	LabelMatchKey      = ctxKey(1)
+	requestIDKey       = ctxKey(2)
+	requestIDHeaderKey = "X-Request-ID"
+)
+
+// RequestIdHeaderKey :
+func RequestIdHeaderKey() string {
+	return requestIDHeaderKey
+}
 
 // CopyLabelMatchContext copies the necessary trace context from given source context to target context.
 func CopyLabelMatchContext(trgt, src context.Context) context.Context {
+	requestID := RequestIDValue(src)
 	v, ok := LabelMatchValue(src)
 	if !ok {
-		return trgt
+		return WithRequestIDValue(trgt, requestID)
 	}
-	return WithLabelMatchValue(trgt, v)
+	return WithRequestIDValue(WithLabelMatchValue(trgt, v), requestID)
 }
 
 // WithLabelMatchValue 设置值
@@ -28,10 +39,45 @@ func WithLabelMatchValue(ctx context.Context, matches [][]*labels.Matcher) conte
 	return context.WithValue(ctx, LabelMatchKey, matches)
 }
 
+// WithLabelMatchValue 设置值
+func WithRequestIDValue(ctx context.Context, id string) context.Context {
+	newCtx := context.WithValue(ctx, requestIDKey, id)
+	return GRPCWithRequestIDValue(newCtx, id)
+}
+
+// GRPCWithRequestIDValue : grpc 需要单独处理
+func GRPCWithRequestIDValue(ctx context.Context, id string) context.Context {
+	ctx = metadata.AppendToOutgoingContext(ctx, requestIDHeaderKey, id)
+	return ctx
+}
+
 // LabelMatchValue 获取值，获取变量, 修改matcher, 支持 namespace 级别过滤
 func LabelMatchValue(ctx context.Context) ([][]*labels.Matcher, bool) {
 	v, ok := ctx.Value(LabelMatchKey).([][]*labels.Matcher)
 	return v, ok
+}
+
+// RequestIDValue 获取值
+func RequestIDValue(ctx context.Context) string {
+	v, ok := ctx.Value(requestIDKey).(string)
+	if !ok || v == "" {
+		return GRPCRequestIDValue(ctx)
+	}
+
+	return v
+}
+
+// GRPCRequestIDValue grpc 需要单独处理
+func GRPCRequestIDValue(ctx context.Context) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ""
+	}
+	values := md.Get(requestIDHeaderKey)
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
 }
 
 // makeSeriesRequest
