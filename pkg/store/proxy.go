@@ -255,7 +255,7 @@ func (s *ProxyStore) Series(r *storepb.SeriesRequest, srv storepb.Store_SeriesSe
 	}
 	storeMatchers, _ := storepb.PromMatchersToMatchers(matchers...) // Error would be returned by matchesExternalLabels, so skip check.
 
-	g, gctx := errgroup.WithContext(srv.Context())
+	g, gctx := errgroup.WithContext(CopyToGRPCValues(srv.Context()))
 
 	// Allow to buffer max 10 series response.
 	// Each might be quite large (multi chunk long series given by sidecar).
@@ -647,7 +647,7 @@ func (s *ProxyStore) LabelNames(ctx context.Context, r *storepb.LabelNamesReques
 		warnings       []string
 		names          [][]string
 		mtx            sync.Mutex
-		g, gctx        = errgroup.WithContext(ctx)
+		g, gctx        = errgroup.WithContext(CopyToGRPCValues(ctx))
 		storeDebugMsgs []string
 	)
 
@@ -715,7 +715,7 @@ func (s *ProxyStore) LabelValues(ctx context.Context, r *storepb.LabelValuesRequ
 		warnings       []string
 		all            [][]string
 		mtx            sync.Mutex
-		g, gctx        = errgroup.WithContext(ctx)
+		g, gctx        = errgroup.WithContext(CopyToGRPCValues(ctx))
 		storeDebugMsgs []string
 	)
 

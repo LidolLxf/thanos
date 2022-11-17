@@ -14,9 +14,16 @@ import (
 
 const (
 	// LabelMatchKey
-	LabelMatchKey      = ctxKey(1)
-	requestIDKey       = ctxKey(2)
-	requestIDHeaderKey = "X-Request-ID"
+	LabelMatchKey           = ctxKey(1)
+	requestIDKey            = ctxKey(2)
+	scopeClusterIDHeaderKey = ctxKey(3)
+	requestIDHeaderKey      = "X-Request-ID"
+)
+
+const (
+	ScopeProjectIDHeaderKey  = "X-Scope-Project-Id"
+	ScopeProjectCodeHeadeKey = "X-Scope-Project-Code"
+	ScopeClusterIDHeaderKey  = "X-Scope-Cluster-Id"
 )
 
 // RequestIdHeaderKey :
@@ -27,11 +34,19 @@ func RequestIdHeaderKey() string {
 // CopyLabelMatchContext copies the necessary trace context from given source context to target context.
 func CopyLabelMatchContext(trgt, src context.Context) context.Context {
 	requestID := RequestIDValue(src)
+	clusterID := ClusterIDValue(src)
 	v, ok := LabelMatchValue(src)
 	if !ok {
 		return WithRequestIDValue(trgt, requestID)
 	}
-	return WithRequestIDValue(WithLabelMatchValue(trgt, v), requestID)
+	return WithScopeClusterIDValue(WithRequestIDValue(WithLabelMatchValue(trgt, v), requestID), clusterID)
+}
+
+// CopyToGRPCValues context to grpc
+func CopyToGRPCValues(ctx context.Context) context.Context {
+	requestID := RequestIDValue(ctx)
+	clusterID := ClusterIDValue(ctx)
+	return WithScopeClusterIDValue(WithRequestIDValue(ctx, requestID), clusterID)
 }
 
 // WithLabelMatchValue 设置值
@@ -45,9 +60,21 @@ func WithRequestIDValue(ctx context.Context, id string) context.Context {
 	return GRPCWithRequestIDValue(newCtx, id)
 }
 
+// WithLabelMatchValue 设置值
+func WithScopeClusterIDValue(ctx context.Context, clusterID string) context.Context {
+	newCtx := context.WithValue(ctx, scopeClusterIDHeaderKey, clusterID)
+	return GRPCWithScopeClusterIDValue(newCtx, clusterID)
+}
+
 // GRPCWithRequestIDValue : grpc 需要单独处理
 func GRPCWithRequestIDValue(ctx context.Context, id string) context.Context {
 	ctx = metadata.AppendToOutgoingContext(ctx, requestIDHeaderKey, id)
+	return ctx
+}
+
+// GRPCWithScopeClusterIDValue
+func GRPCWithScopeClusterIDValue(ctx context.Context, clusterID string) context.Context {
+	ctx = metadata.AppendToOutgoingContext(ctx, ScopeClusterIDHeaderKey, clusterID)
 	return ctx
 }
 
@@ -67,6 +94,16 @@ func RequestIDValue(ctx context.Context) string {
 	return v
 }
 
+// ClusterIDValue 集群ID值
+func ClusterIDValue(ctx context.Context) string {
+	v, ok := ctx.Value(scopeClusterIDHeaderKey).(string)
+	if !ok || v == "" {
+		return GRPCClusterIDValue(ctx)
+	}
+
+	return v
+}
+
 // GRPCRequestIDValue grpc 需要单独处理
 func GRPCRequestIDValue(ctx context.Context) string {
 	md, ok := metadata.FromIncomingContext(ctx)
@@ -74,6 +111,19 @@ func GRPCRequestIDValue(ctx context.Context) string {
 		return ""
 	}
 	values := md.Get(requestIDHeaderKey)
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
+}
+
+// GRPCClusterIDValue
+func GRPCClusterIDValue(ctx context.Context) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ""
+	}
+	values := md.Get(ScopeClusterIDHeaderKey)
 	if len(values) == 0 {
 		return ""
 	}
