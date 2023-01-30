@@ -252,6 +252,7 @@ func (s *ProxyStore) Series(originalRequest *storepb.SeriesRequest, srv storepb.
 	}
 	storeMatchers, _ := storepb.PromMatchersToMatchers(matchers...) // Error would be returned by matchesExternalLabels, so skip check.
 
+	_, gctx := errgroup.WithContext(CopyToGRPCValues(srv.Context()))
 	storeDebugMsgs := []string{}
 	r := &storepb.SeriesRequest{
 		MinTime:                 originalRequest.MinTime,
@@ -269,7 +270,7 @@ func (s *ProxyStore) Series(originalRequest *storepb.SeriesRequest, srv storepb.
 	stores := []Client{}
 	for _, st := range s.stores() {
 		// We might be able to skip the store if its meta information indicates it cannot have series matching our query.
-		if ok, reason := storeMatches(srv.Context(), st, originalRequest.MinTime, originalRequest.MaxTime, matchers...); !ok {
+		if ok, reason := storeMatches(gctx, st, originalRequest.MinTime, originalRequest.MaxTime, matchers...); !ok {
 			storeDebugMsgs = append(storeDebugMsgs, fmt.Sprintf("store %s filtered out: %v", st, reason))
 			continue
 		}
@@ -278,8 +279,15 @@ func (s *ProxyStore) Series(originalRequest *storepb.SeriesRequest, srv storepb.
 	}
 
 	if len(stores) == 0 {
+		// This is indicates that configured StoreAPIs are not the ones end user expects.
 		err := errors.New("No StoreAPIs matched for this query")
-		level.Warn(reqLogger).Log("err", err, "stores", strings.Join(storeDebugMsgs, ";"))
+		// bcs patch, 减少日志长度
+		storesMsg := strings.Join(storeDebugMsgs, ";")
+		if len(storesMsg) > 64 {
+			storesMsg = storesMsg[:64] + "...(truncated)"
+		}
+		level.Warn(reqLogger).Log("err", err, "stores", storesMsg)
+
 		if sendErr := srv.Send(storepb.NewWarnSeriesResponse(err)); sendErr != nil {
 			level.Error(reqLogger).Log("err", sendErr)
 			return status.Error(codes.Unknown, errors.Wrap(sendErr, "send series response").Error())
@@ -348,7 +356,7 @@ func storeMatches(ctx context.Context, s Client, mint, maxt int64, matchers ...*
 		return false, fmt.Sprintf("does not have data within this time period: [%v,%v]. Store time ranges: [%v,%v]", mint, maxt, storeMinTime, storeMaxTime)
 	}
 
-	if ok, reason := storeMatchDebugMetadata(s, storeDebugMatcher); !ok {
+	if ok, reason := storeMatchAnyMetadata(s, storeDebugMatcher); !ok {
 		return false, reason
 	}
 
@@ -409,7 +417,7 @@ func (s *ProxyStore) LabelNames(ctx context.Context, r *storepb.LabelNamesReques
 		warnings       []string
 		names          [][]string
 		mtx            sync.Mutex
-		g, gctx        = errgroup.WithContext(ctx)
+		g, gctx        = errgroup.WithContext(CopyToGRPCValues(ctx))
 		storeDebugMsgs []string
 	)
 
@@ -423,32 +431,45 @@ func (s *ProxyStore) LabelNames(ctx context.Context, r *storepb.LabelNamesReques
 		}
 		storeDebugMsgs = append(storeDebugMsgs, fmt.Sprintf("Store %s queried", st))
 
-		g.Go(func() error {
-			resp, err := st.LabelNames(gctx, &storepb.LabelNamesRequest{
-				PartialResponseDisabled: r.PartialResponseDisabled,
-				Start:                   r.Start,
-				End:                     r.End,
-				Matchers:                r.Matchers,
-			})
-			if err != nil {
-				err = errors.Wrapf(err, "fetch label names from store %s", st)
-				if r.PartialResponseDisabled {
-					return err
-				}
+		// BCS
+		req := &storepb.LabelNamesRequest{
+			PartialResponseDisabled: r.PartialResponseDisabled,
+			Start:                   r.Start,
+			End:                     r.End,
+			Matchers:                r.Matchers,
+		}
 
-				mtx.Lock()
-				warnings = append(warnings, err.Error())
-				mtx.Unlock()
-				return nil
-			}
+		for _, newReq := range makeLabelNamesRequest(gctx, req) {
+			func(r *storepb.LabelNamesRequest) {
+				g.Go(func() error {
 
-			mtx.Lock()
-			warnings = append(warnings, resp.Warnings...)
-			names = append(names, resp.Names)
-			mtx.Unlock()
+					resp, err := st.LabelNames(gctx, &storepb.LabelNamesRequest{
+						PartialResponseDisabled: r.PartialResponseDisabled,
+						Start:                   r.Start,
+						End:                     r.End,
+						Matchers:                r.Matchers,
+					})
+					if err != nil {
+						err = errors.Wrapf(err, "fetch label names from store %s", st)
+						if r.PartialResponseDisabled {
+							return err
+						}
 
-			return nil
-		})
+						mtx.Lock()
+						warnings = append(warnings, err.Error())
+						mtx.Unlock()
+						return nil
+					}
+
+					mtx.Lock()
+					warnings = append(warnings, resp.Warnings...)
+					names = append(names, resp.Names)
+					mtx.Unlock()
+
+					return nil
+				})
+			}(newReq)
+		}
 	}
 
 	if err := g.Wait(); err != nil {
@@ -470,7 +491,7 @@ func (s *ProxyStore) LabelValues(ctx context.Context, r *storepb.LabelValuesRequ
 		warnings       []string
 		all            [][]string
 		mtx            sync.Mutex
-		g, gctx        = errgroup.WithContext(ctx)
+		g, gctx        = errgroup.WithContext(CopyToGRPCValues(ctx))
 		storeDebugMsgs []string
 		span           opentracing.Span
 	)
@@ -497,34 +518,47 @@ func (s *ProxyStore) LabelValues(ctx context.Context, r *storepb.LabelValuesRequ
 		}
 		storeDebugMsgs = append(storeDebugMsgs, fmt.Sprintf("Store %s queried", st))
 
-		g.Go(func() error {
-			resp, err := st.LabelValues(gctx, &storepb.LabelValuesRequest{
-				Label:                   r.Label,
-				PartialResponseDisabled: r.PartialResponseDisabled,
-				Start:                   r.Start,
-				End:                     r.End,
-				Matchers:                r.Matchers,
-			})
-			if err != nil {
-				msg := "fetch label values from store %s"
-				err = errors.Wrapf(err, msg, st)
-				if r.PartialResponseDisabled {
-					return err
-				}
+		// BCS
+		req := &storepb.LabelValuesRequest{
+			Label:                   r.Label,
+			PartialResponseDisabled: r.PartialResponseDisabled,
+			Start:                   r.Start,
+			End:                     r.End,
+			Matchers:                r.Matchers,
+		}
 
-				mtx.Lock()
-				warnings = append(warnings, errors.Wrapf(err, msg, st).Error())
-				mtx.Unlock()
-				return nil
-			}
+		for _, newReq := range makeLabelValuesRequest(gctx, req) {
+			func(r *storepb.LabelValuesRequest) {
+				g.Go(func() error {
+					resp, err := st.LabelValues(gctx, &storepb.LabelValuesRequest{
+						Label:                   r.Label,
+						PartialResponseDisabled: r.PartialResponseDisabled,
+						Start:                   r.Start,
+						End:                     r.End,
+						Matchers:                r.Matchers,
+					})
+					if err != nil {
+						msg := "fetch label values from store %s"
+						err = errors.Wrapf(err, msg, st)
+						if r.PartialResponseDisabled {
+							return err
+						}
 
-			mtx.Lock()
-			warnings = append(warnings, resp.Warnings...)
-			all = append(all, resp.Values)
-			mtx.Unlock()
+						mtx.Lock()
+						warnings = append(warnings, errors.Wrapf(err, msg, st).Error())
+						mtx.Unlock()
+						return nil
+					}
 
-			return nil
-		})
+					mtx.Lock()
+					warnings = append(warnings, resp.Warnings...)
+					all = append(all, resp.Values)
+					mtx.Unlock()
+
+					return nil
+				})
+			}(newReq)
+		}
 	}
 
 	if err := g.Wait(); err != nil {
