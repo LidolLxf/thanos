@@ -239,9 +239,20 @@ func (s cancelableRespSender) send(r *storepb.SeriesResponse) {
 // Series returns all series for a requested time range and label matcher. Requested series are taken from other
 // stores and proxied to RPC client. NOTE: Resulted data are not trimmed exactly to min and max time range.
 func (s *ProxyStore) Series(r *storepb.SeriesRequest, srv storepb.Store_SeriesServer) error {
+	ctx := srv.Context()
 	// TODO(bwplotka): This should be part of request logger, otherwise it does not make much sense. Also, could be
 	// tiggered by tracing span to reduce cognitive load.
 	reqLogger := log.With(s.logger, "component", "proxy", "request", r.String())
+
+	clusterId, err := GetLabelMatchValue("cluster_id", r.Matchers)
+	if err != nil {
+		return err
+	}
+
+	scopeClusterID := ClusterIDValue(ctx)
+	if clusterId == "" && scopeClusterID == "" {
+		return nil
+	}
 
 	match, matchers, err := matchesExternalLabels(r.Matchers, s.selectorLabels)
 	if err != nil {
@@ -774,4 +785,24 @@ func (s *ProxyStore) LabelValues(ctx context.Context, r *storepb.LabelValuesRequ
 		Values:   strutil.MergeUnsortedSlices(all...),
 		Warnings: warnings,
 	}, nil
+}
+
+// GetLabelMatchValue :
+func GetLabelMatchValue(name string, matchers []storepb.LabelMatcher) (string, error) {
+	m := GetLabelMatch(name, matchers)
+	if m == nil {
+		return "", nil
+	}
+	return m.Value, nil
+}
+
+// GetLabelMatch :
+func GetLabelMatch(name string, matchers []storepb.LabelMatcher) *storepb.LabelMatcher {
+	// 可能存在多个名称相同的 LabelMatch, prom解析为且的关系, 因为这里只支持=, =~, 可忽略这种 case
+	for _, m := range matchers {
+		if m.Name == name {
+			return &m
+		}
+	}
+	return nil
 }
