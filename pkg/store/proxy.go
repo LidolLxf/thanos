@@ -244,15 +244,20 @@ func (s *ProxyStore) Series(r *storepb.SeriesRequest, srv storepb.Store_SeriesSe
 	// tiggered by tracing span to reduce cognitive load.
 	reqLogger := log.With(s.logger, "component", "proxy", "request", r.String())
 
+	// add cluster id filter
 	clusterId, err := GetLabelMatchValue("cluster_id", r.Matchers)
 	if err != nil {
 		return err
 	}
-
 	scopeClusterID := ClusterIDValue(ctx)
 	if clusterId == "" && scopeClusterID == "" {
 		return nil
 	}
+	if scopeClusterID != "" {
+		clusterId = scopeClusterID
+	}
+	r.Matchers = append(r.Matchers, storepb.LabelMatcher{Type: storepb.LabelMatcher_EQ,
+		Name: "cluster_id", Value: clusterId})
 
 	match, matchers, err := matchesExternalLabels(r.Matchers, s.selectorLabels)
 	if err != nil {
