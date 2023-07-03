@@ -24,6 +24,7 @@ const (
 	ScopeProjectIDHeaderKey  = "X-Scope-Project-Id"
 	ScopeProjectCodeHeadeKey = "X-Scope-Project-Code"
 	ScopeClusterIDHeaderKey  = "X-Scope-Cluster-Id"
+	TraceParentKey           = "Traceparent"
 )
 
 // RequestIdHeaderKey :
@@ -36,6 +37,7 @@ func CopyLabelMatchContext(trgt, src context.Context) context.Context {
 	requestID := RequestIDValue(src)
 	clusterID := ClusterIDValue(src)
 	v, ok := LabelMatchValue(src)
+	trgt = GRPCTraceParentValue(trgt, src)
 	if !ok {
 		return WithRequestIDValue(trgt, requestID)
 	}
@@ -128,6 +130,20 @@ func GRPCClusterIDValue(ctx context.Context) string {
 		return ""
 	}
 	return values[0]
+}
+
+// GRPCTraceParentValue grpc透传traceparent
+func GRPCTraceParentValue(trgt, src context.Context) context.Context {
+	md, ok := metadata.FromOutgoingContext(src)
+	if !ok {
+		return trgt
+	}
+	values := md.Get(TraceParentKey)
+	if len(values) == 0 {
+		return trgt
+	}
+	trgt = metadata.AppendToOutgoingContext(trgt, TraceParentKey, values[0])
+	return trgt
 }
 
 // makeSeriesRequest

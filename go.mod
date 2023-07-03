@@ -76,10 +76,10 @@ require (
 	go.elastic.co/apm v1.11.0
 	go.elastic.co/apm/module/apmot v1.11.0
 	go.opentelemetry.io/contrib/propagators/ot v1.4.0
-	go.opentelemetry.io/otel v1.5.0
-	go.opentelemetry.io/otel/bridge/opentracing v1.5.0
-	go.opentelemetry.io/otel/sdk v1.5.0
-	go.opentelemetry.io/otel/trace v1.5.0
+	go.opentelemetry.io/otel v1.14.0
+	go.opentelemetry.io/otel/bridge/opentracing v1.14.0
+	go.opentelemetry.io/otel/sdk v1.14.0
+	go.opentelemetry.io/otel/trace v1.14.0
 	go.uber.org/atomic v1.9.0
 	go.uber.org/automaxprocs v1.4.0
 	go.uber.org/goleak v1.1.12
@@ -95,7 +95,12 @@ require (
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/fsnotify.v1 v1.4.7
 	gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 v3.0.1
+)
+
+require (
+	github.com/google/uuid v1.2.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.28.0
 )
 
 require (
@@ -135,7 +140,7 @@ require (
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/felixge/httpsnoop v1.0.2 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
-	github.com/go-logr/logr v1.2.2 // indirect
+	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/analysis v0.20.0 // indirect
 	github.com/go-openapi/errors v0.20.0 // indirect
@@ -154,10 +159,9 @@ require (
 	github.com/gogo/googleapis v1.4.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.0.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/go-cmp v0.5.7 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/google/pprof v0.0.0-20211214055906-6f57359322fd // indirect
-	github.com/google/uuid v1.2.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
@@ -190,8 +194,8 @@ require (
 	github.com/sercand/kuberesolver v2.4.0+incompatible // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/sony/gobreaker v0.4.1 // indirect
-	github.com/stretchr/objx v0.2.0 // indirect
-	github.com/stretchr/testify v1.7.0 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
+	github.com/stretchr/testify v1.8.2 // indirect
 	github.com/weaveworks/promrus v1.2.0 // indirect
 	github.com/yuin/gopher-lua v0.0.0-20200816102855-ee81675732da // indirect
 	go.elastic.co/apm/module/apmhttp v1.11.0 // indirect
@@ -199,7 +203,7 @@ require (
 	go.mongodb.org/mongo-driver v1.7.5 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/mod v0.5.1 // indirect
-	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
+	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
 	golang.org/x/tools v0.1.9-0.20211209172050-90a85b2969be // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
