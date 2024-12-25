@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tracing"
@@ -358,7 +359,13 @@ func (s *ProxyStore) Series(r *storepb.SeriesRequest, srv storepb.Store_SeriesSe
 			}
 		}
 
-		level.Debug(reqLogger).Log("msg", "Series: started fanout streams", "status", strings.Join(storeDebugMsgs, ";"))
+		// 手动截取status内容大小
+		debugMsgs := strings.Join(storeDebugMsgs, ";")
+		if len(debugMsgs) > 1024 {
+			debugMsgs = fmt.Sprintf("%s...(Total %s)", debugMsgs[:1024], humanize.Bytes(uint64(len(debugMsgs))))
+		}
+
+		level.Debug(reqLogger).Log("msg", "Series: started fanout streams", "status", debugMsgs)
 
 		if len(seriesSet) == 0 {
 			// This is indicates that configured StoreAPIs are not the ones end user expects.
