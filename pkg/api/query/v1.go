@@ -55,6 +55,7 @@ import (
 	"github.com/thanos-io/thanos/pkg/rules"
 	"github.com/thanos-io/thanos/pkg/rules/rulespb"
 	"github.com/thanos-io/thanos/pkg/runutil"
+	"github.com/thanos-io/thanos/pkg/store"
 	"github.com/thanos-io/thanos/pkg/store/storepb"
 	"github.com/thanos-io/thanos/pkg/targets"
 	"github.com/thanos-io/thanos/pkg/targets/targetspb"
@@ -269,10 +270,16 @@ func (qapi *QueryAPI) parseDownsamplingParamMillis(r *http.Request, defaultVal t
 }
 
 func (qapi *QueryAPI) parsePartialResponseParam(r *http.Request, defaultEnablePartialResponse bool) (enablePartialResponse bool, _ *api.ApiError) {
+	// 优先级： header > param
+	partialResponse := store.PartialResponseValue(r.Context())
+	if partialResponse == "" {
+		partialResponse = r.FormValue(PartialResponseParam)
+	}
+
 	// Overwrite the cli flag when provided as a query parameter.
-	if val := r.FormValue(PartialResponseParam); val != "" {
+	if partialResponse != "" {
 		var err error
-		defaultEnablePartialResponse, err = strconv.ParseBool(val)
+		defaultEnablePartialResponse, err = strconv.ParseBool(partialResponse)
 		if err != nil {
 			return false, &api.ApiError{Typ: api.ErrorBadData, Err: errors.Wrapf(err, "'%s' parameter", PartialResponseParam)}
 		}
