@@ -14,16 +14,18 @@ import (
 
 const (
 	// LabelMatchKey
-	LabelMatchKey           = ctxKey(1)
-	requestIDKey            = ctxKey(2)
-	scopeClusterIDHeaderKey = ctxKey(3)
-	requestIDHeaderKey      = "X-Request-ID"
+	LabelMatchKey            = ctxKey(1)
+	requestIDKey             = ctxKey(2)
+	scopeClusterIDHeaderKey  = ctxKey(3)
+	partialResponseHeaderKey = ctxKey(4)
+	requestIDHeaderKey       = "X-Request-ID"
 )
 
 const (
 	ScopeProjectIDHeaderKey  = "X-Scope-Project-Id"
 	ScopeProjectCodeHeadeKey = "X-Scope-Project-Code"
 	ScopeClusterIDHeaderKey  = "X-Scope-Cluster-Id"
+	PartialResponseHeaderKey = "X-Partial-Response"
 	TraceParentKey           = "Traceparent"
 )
 
@@ -68,6 +70,12 @@ func WithScopeClusterIDValue(ctx context.Context, clusterID string) context.Cont
 	return GRPCWithScopeClusterIDValue(newCtx, clusterID)
 }
 
+// WithPartialResponseValue WithLabelMatchValue 设置值
+func WithPartialResponseValue(ctx context.Context, partialResponse string) context.Context {
+	newCtx := context.WithValue(ctx, partialResponseHeaderKey, partialResponse)
+	return GRPCWithPartialResponseValue(newCtx, partialResponse)
+}
+
 // GRPCWithRequestIDValue : grpc 需要单独处理
 func GRPCWithRequestIDValue(ctx context.Context, id string) context.Context {
 	ctx = metadata.AppendToOutgoingContext(ctx, requestIDHeaderKey, id)
@@ -77,6 +85,12 @@ func GRPCWithRequestIDValue(ctx context.Context, id string) context.Context {
 // GRPCWithScopeClusterIDValue
 func GRPCWithScopeClusterIDValue(ctx context.Context, clusterID string) context.Context {
 	ctx = metadata.AppendToOutgoingContext(ctx, ScopeClusterIDHeaderKey, clusterID)
+	return ctx
+}
+
+// GRPCWithPartialResponseValue
+func GRPCWithPartialResponseValue(ctx context.Context, partialResponse string) context.Context {
+	ctx = metadata.AppendToOutgoingContext(ctx, PartialResponseHeaderKey, partialResponse)
 	return ctx
 }
 
@@ -106,6 +120,16 @@ func ClusterIDValue(ctx context.Context) string {
 	return v
 }
 
+// PartialResponseValue PartialResponse值
+func PartialResponseValue(ctx context.Context) string {
+	v, ok := ctx.Value(partialResponseHeaderKey).(string)
+	if !ok || v == "" {
+		return GRPCPartialResponseValue(ctx)
+	}
+
+	return v
+}
+
 // GRPCRequestIDValue grpc 需要单独处理
 func GRPCRequestIDValue(ctx context.Context) string {
 	md, ok := metadata.FromIncomingContext(ctx)
@@ -126,6 +150,19 @@ func GRPCClusterIDValue(ctx context.Context) string {
 		return ""
 	}
 	values := md.Get(ScopeClusterIDHeaderKey)
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
+}
+
+// GRPCPartialResponseValue
+func GRPCPartialResponseValue(ctx context.Context) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ""
+	}
+	values := md.Get(PartialResponseHeaderKey)
 	if len(values) == 0 {
 		return ""
 	}
